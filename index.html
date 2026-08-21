@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Casa de Construção - Atendimento</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #5478ad;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .chat {
+      width: 100%;
+      max-width: 420px;
+      height: 640px;
+      background: #f0ecec;
+      border-radius: 16px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .chat__header {
+      background: #f59e0b;
+      color: #fff;
+      padding: 16px 20px;
+    }
+    .chat__header h1 { font-size: 17px; }
+    .chat__header p { font-size: 12px; opacity: 0.9; margin-top: 2px; }
+    .chat__body {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: #f7f8fa;
+    }
+    .msg {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 14px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .msg--bot { background: #fff; border: 1px solid #e5e7eb; align-self: flex-start; border-bottom-left-radius: 4px; }
+    .msg--user { background: #f59e0b; color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .msg--typing { font-style: italic; color: #888; }
+    .chat__footer {
+      display: flex;
+      gap: 8px;
+      padding: 12px;
+      border-top: 1px solid #eee;
+      background: #fff;
+    }
+    .chat__footer input {
+      flex: 1;
+      border: 1px solid #d1d5db;
+      border-radius: 20px;
+      padding: 10px 14px;
+      font-size: 14px;
+      outline: none;
+    }
+    .chat__footer input:focus { border-color: #f59e0b; }
+    .chat__footer button {
+      background: #f59e0b;
+      color: #fff;
+      border: none;
+      border-radius: 20px;
+      padding: 0 18px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .chat__footer button:disabled { opacity: 0.5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <div class="chat">
+    <div class="chat__header">
+      <h1>Casa de Construção</h1>
+      <p>Atendimento virtual</p>
+    </div>
+    <div class="chat__body" id="body"></div>
+    <form class="chat__footer" id="form">
+      <input id="input" type="text" placeholder="Digite sua mensagem..." autocomplete="off" />
+      <button type="submit" id="send">Enviar</button>
+    </form>
+  </div>
+
+  <script>
+    const WEBHOOK_URL = "https://eversonpedrodev.app.n8n.cloud/webhook/chtned";
+
+    // sessionId único por navegador (mantém o histórico da conversa)
+    let sessionId = localStorage.getItem("cdc_session");
+    if (!sessionId) {
+      sessionId = "sess-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+      localStorage.setItem("cdc_session", sessionId);
+    }
+
+    const body = document.getElementById("body");
+    const form = document.getElementById("form");
+    const input = document.getElementById("input");
+    const send = document.getElementById("send");
+
+    function addMessage(text, who) {
+      const div = document.createElement("div");
+      div.className = "msg msg--" + who;
+      div.textContent = text;
+      body.appendChild(div);
+      body.scrollTop = body.scrollHeight;
+      return div;
+    }
+
+    // Mensagem de boas-vindas ao abrir a página
+    addMessage("Olá, bem vindo a casa de material de construção, como posso te ajudar?", "bot");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      addMessage(text, "user");
+      input.value = "";
+      send.disabled = true;
+
+      const typing = addMessage("Digitando...", "bot");
+      typing.classList.add("msg--typing");
+
+      try {
+        const res = await fetch(WEBHOOK_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chatInput: text, sessionId: sessionId }),
+        });
+        const data = await res.json();
+        typing.remove();
+        addMessage(data.reply || "Desculpe, não consegui responder agora.", "bot");
+      } catch (err) {
+        typing.remove();
+        addMessage("Ops, tive um problema para me conectar. Tente novamente.", "bot");
+        console.error(err);
+      } finally {
+        send.disabled = false;
+        input.focus();
+      }
+    });
+  </script>
+</body>
+</html>
